@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: EC2 (Ubuntu) + MySQL RDS in existing VPC using secure SG rules.
+
+Parameters:
+  KeyPairName:
+    Type: String
+    Default: EC2
+    Description: Name of the EC2 Key Pair to SSH
+
+Resources:
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH only from Dhilshad Home IP
+      VpcId: vpc-0ec55c81d2dd1fb90
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 59.93.37.196/32  # Dhilshad's IP
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow MySQL only from EC2
+      VpcId: vpc-0ec55c81d2dd1fb90
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2SecurityGroup
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0e86e20dae9224db8 # Ubuntu 22.04 LTS - us-east-1
+      InstanceType: t3.micro
+      KeyName: !Ref KeyPairName
+      SubnetId: subnet-0fc84252db2ffd122 # Public Subnet
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: CFN-EC2-Ubuntu
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group with 2 AZs for RDS
+      SubnetIds:
+        - subnet-0fc84252db2ffd122 # Public Subnet
+        - subnet-03e204a437d97ba51 # Private Subnet
+      DBSubnetGroupName: dhilshad-db-subnet-group
+
+  MyDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: cloudformation-mysql-db
+      Engine: mysql
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      MasterUsername: admin
+      MasterUserPassword: StrongPassw0rd!
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: CFN-RDS-MySQL
+
+Outputs:
+  EC2PublicIP:
+    Description: SSH IP of EC2
+    Value: !GetAtt EC2Instance.PublicIp
+
+  RDSEndpoint:
+    Description: RDS MySQL Endpoint
+    Value: !GetAtt MyDB.Endpoint.Address
