@@ -18,7 +18,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 59.93.37.196/32  # Dhilshad's IP
+          CidrIp:  # Dhilshad's IP
 
   RDSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
